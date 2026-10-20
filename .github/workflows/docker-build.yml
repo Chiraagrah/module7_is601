@@ -28,7 +28,7 @@ jobs:
     # 2. Run pytest inside the container
     - name: Run Tests in Container
       run: |
-        docker run --rm qr-code-generator:test pytest
+        docker run --rm --entrypoint pytest qr-code-generator:test
 
     # 3. Log in to Docker Hub (only runs if tests pass successfully)
     - name: Log in to Docker Hub

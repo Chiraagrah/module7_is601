@@ -1,82 +1,36 @@
-import sys
-import qrcode
-from dotenv import load_dotenv
-import logging.config
 from pathlib import Path
-import os
-import argparse
-from datetime import datetime
-import validators  # Import the validators package
+import pytest
+from main import is_valid_url, create_directory, generate_qr_code
 
-# Load environment variables
-load_dotenv()
+def test_is_valid_url_success():
+    """Test that valid URLs pass validation."""
+    assert is_valid_url("https://github.com/Chiraagrah") is True
+    assert is_valid_url("https://example.com") is True
 
-# Environment Variables for Configuration
-QR_DIRECTORY = os.getenv('QR_CODE_DIR', 'qr_codes')  # Directory for saving QR code
-FILL_COLOR = os.getenv('FILL_COLOR', 'red')  # Fill color for the QR code
-BACK_COLOR = os.getenv('BACK_COLOR', 'white')  # Background color for the QR code
+def test_is_valid_url_failure():
+    """Test that invalid strings fail URL validation."""
+    assert is_valid_url("not_a_url") is False
+    assert is_valid_url("htp://invalid-url") is False
 
-def setup_logging():
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-        ]
-    )
+def test_create_directory(tmp_path):
+    """Test that directory creation works correctly using pytest's tmp_path fixture."""
+    test_dir = tmp_path / "qr_codes_test"
+    create_directory(test_dir)
+    assert test_dir.exists()
+    assert test_dir.is_dir()
 
-def create_directory(path: Path):
-    try:
-        path.mkdir(parents=True, exist_ok=True)
-    except Exception as e:
-        logging.error(f"Failed to create directory {path}: {e}")
-        exit(1)
-
-def is_valid_url(url):
-    if validators.url(url):
-        return True
-    else:
-        logging.error(f"Invalid URL provided: {url}")
-        return False
-
-def generate_qr_code(data, path, fill_color='red', back_color='white'):
-    if not is_valid_url(data):
-        return  # Exit the function if the URL is not valid
-
-    try:
-        qr = qrcode.QRCode(version=1, box_size=10, border=5)
-        qr.add_data(data)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color=fill_color, back_color=back_color)
-
-        with path.open('wb') as qr_file:
-            img.save(qr_file)
-        logging.info(f"QR code successfully saved to {path}")
-
-    except Exception as e:
-        logging.error(f"An error occurred while generating or saving the QR code: {e}")
-
-def main():
-    # Set up command-line argument parsing
-    parser = argparse.ArgumentParser(description='Generate a QR code.')
-    parser.add_argument('--url', help='The URL to encode in the QR code', default='https://github.com/Chiraagrah')
-    args = parser.parse_args()
-
-    # Initial logging setup
-    setup_logging()
+def test_generate_qr_code_success(tmp_path):
+    """Test that a valid URL successfully generates and saves a QR code PNG file."""
+    file_path = tmp_path / "test_code.png"
+    generate_qr_code("https://example.com", file_path)
     
-    # Generate a timestamped filename for the QR code
-    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-    qr_filename = f"QRCode_{timestamp}.png"
+    assert file_path.exists()
+    assert file_path.is_file()
+    assert file_path.stat().st_size > 0  # Ensure the image file isn't empty
 
-    # Create the full path for the QR code file
-    qr_code_full_path = Path.cwd() / QR_DIRECTORY / qr_filename
+def test_generate_qr_code_invalid_url(tmp_path):
+    """Test that an invalid URL returns early and does not create an image file."""
+    file_path = tmp_path / "invalid_code.png"
+    generate_qr_code("invalid-url-string", file_path)
     
-    # Ensure the QR code directory exists
-    create_directory(Path.cwd() / QR_DIRECTORY)
-    
-    # Generate and save the QR code
-    generate_qr_code(args.url, qr_code_full_path, FILL_COLOR, BACK_COLOR)
-
-if __name__ == "__main__":
-    main()
+    assert not file_path.exists()
